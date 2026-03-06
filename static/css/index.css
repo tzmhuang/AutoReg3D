@@ -23,7 +23,7 @@ body {
 }
 
 .publication-authors a {
-  color: hsl(204, 86%, 53%);
+  color: #219cee !important;
 }
 
 .publication-authors .author-block {
