@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="AutoReg3D: Autoregressive 3D Object Detection from Point Clouds">
+  <meta name="keywords" content="AutoReg3D, 3D Object Detection, Autoregressive, LiDAR, Point Cloud, nuScenes">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AutoReg3D: On the Feasibility and Opportunity of Autoregressive 3D Object Detection</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+</head>
+<body>
+
+<!-- Hero -->
+<section class="hero is-light">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <p class="publication-venue is-size-5 mb-2">CVPR Findings 2026</p>
+          <h1 class="title is-1 publication-title">
+            On the Feasibility and Opportunity of<br>Autoregressive 3D Object Detection
+          </h1>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><a href="#">Zanming Huang</a><sup>1</sup>,</span>
+            <span class="author-block"><a href="#">Jinsu Yoo</a><sup>1</sup>,</span>
+            <span class="author-block"><a href="#">Sooyoung Jeon</a><sup>1</sup>,</span>
+            <span class="author-block"><a href="#">Zhenzhen Liu</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="#">Mark Campbell</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="#">Kilian Q Weinberger</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="#">Bharath Hariharan</a><sup>2</sup>,</span>
+            <span class="author-block"><a href="#">Wei-Lun Chao</a><sup>1,3</sup>,</span>
+            <span class="author-block"><a href="#">Katie Z Luo</a><sup>4</sup></span>
+          </div>
+
+          <div class="is-size-6 publication-authors mt-2">
+            <span class="author-block"><sup>1</sup>The Ohio State University,</span>
+            <span class="author-block"><sup>2</sup>Cornell University,</span>
+            <span class="author-block"><sup>3</sup>Boston University,</span>
+            <span class="author-block"><sup>4</sup>Stanford University</span>
+          </div>
+
+          <div class="column has-text-centered mt-4">
+            <div class="publication-links link-block">
+              <a class="button is-rounded is-dark" href="https://arxiv.org/abs/XXXX.XXXXX" target="_blank">
+                <span class="icon"><i class="ai ai-arxiv"></i></span>
+                <span>arXiv</span>
+              </a>
+              <a class="button is-rounded is-dark" href="https://tzmhuang.github.io/autoreg3d" target="_blank">
+                <span class="icon"><i class="fab fa-github"></i></span>
+                <span>Code (Coming Soon)</span>
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Abstract -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-title">Abstract</h2>
+    <div class="content has-text-justified">
+      <p>
+        LiDAR-based 3D object detectors typically rely on proposal heads with hand-crafted components like anchor assignment and non-maximum suppression (NMS), complicating training and limiting extensibility. We present <strong>AutoReg3D</strong>, an autoregressive 3D detector that casts detection as sequence generation. Given point-cloud features, AutoReg3D emits objects in a <strong>range-causal (near-to-far) order</strong> and encodes each object as a short, discrete-token sequence consisting of its center, size, orientation, velocity, and class.
+      </p>
+      <p>
+        This near-to-far ordering mirrors LiDAR geometry — near objects occlude far ones but not vice versa — enabling straightforward teacher forcing during training and autoregressive decoding at test time. AutoReg3D is compatible across diverse point-cloud backbones and attains <strong>competitive nuScenes performance without anchors or NMS</strong>. Beyond parity, the sequential formulation unlocks language-model advances for 3D perception, including <strong>GRPO-style reinforcement learning</strong> for task-aligned objectives. These results position autoregressive decoding as a viable, flexible alternative for LiDAR-based detection and open a path to importing modern sequence-modeling tools into 3D perception.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- Pipeline Figure -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-title">How It Works</h2>
+
+    <div class="pipeline-container">
+      <!-- Pipeline steps -->
+      <div class="columns is-vcentered is-mobile mb-4">
+        <div class="column">
+          <div class="pipeline-step-box">
+            <div class="step-num">1</div>
+            <h4>Point Cloud Encoder</h4>
+            <p class="is-size-7 has-text-grey">Pillar, Voxel, Transformer, or Mamba backbone</p>
+          </div>
+        </div>
+        <div class="column is-narrow pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="column">
+          <div class="pipeline-step-box">
+            <div class="step-num">2</div>
+            <h4>Tokenize Objects</h4>
+            <p class="is-size-7 has-text-grey">Each 3D box → 10 discrete tokens</p>
+          </div>
+        </div>
+        <div class="column is-narrow pipeline-arrow"><i class="fas fa-arrow-right"></i></div>
+        <div class="column">
+          <div class="pipeline-step-box">
+            <div class="step-num">3</div>
+            <h4>Autoregressive Decoder</h4>
+            <p class="is-size-7 has-text-grey">Near-to-far autoregressive generation</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model Arch Figure -->
+      <div class="model-arch">
+        <img src="static/images/pipeline/figure.png" alt="Model Architecture Diagram">
+      </div>
+
+      <!-- Token visualization -->
+      <!-- <p class="has-text-centered has-text-weight-semibold is-size-6 mb-2">Object Token Sequence</p> -->
+      <!-- <div class="token-strip">
+        <span class="token-chip special">⟨start⟩</span>
+        <span class="token-chip cls">cls</span>
+        <span class="token-chip geo">x</span>
+        <span class="token-chip geo">y</span>
+        <span class="token-chip geo">z</span>
+        <span class="token-chip geo">l</span>
+        <span class="token-chip geo">w</span>
+        <span class="token-chip geo">h</span>
+        <span class="token-chip geo">ψ</span>
+        <span class="token-chip geo">v<sub>x</sub></span>
+        <span class="token-chip geo">v<sub>y</sub></span>
+        <span class="token-chip dots">···</span>
+        <span class="token-chip cls">cls</span>
+        <span class="token-chip geo">x</span>
+        <span class="token-chip geo">y</span>
+        <span class="token-chip dots">···</span>
+        <span class="token-chip special">⟨end⟩</span>
+      </div> -->
+      <!-- <p class="has-text-centered is-size-7 has-text-grey">
+        <span style="color:#e57373">■</span> class &nbsp;
+        <span style="color:#ba68c8">■</span> geometry &nbsp;
+        <span style="color:#ffb74d">■</span> velocity &nbsp;
+        <span style="color:#4a90d9">■</span> special
+      </p> -->
+    </div>
+
+    <!-- What it eliminates -->
+    <div class="columns mt-5">
+      <div class="column is-6">
+        <h3 class="title is-5 section-title">What AutoReg3D Eliminates</h3>
+        <div class="eliminated-item"><span class="icon-x"><i class="fas fa-times"></i></span> Anchor assignment & configuration</div>
+        <div class="eliminated-item"><span class="icon-x"><i class="fas fa-times"></i></span> Hand-crafted per-attribute loss weighting</div>
+        <div class="eliminated-item"><span class="icon-x"><i class="fas fa-times"></i></span> Proposal matching (e.g., Hungarian)</div>
+        <div class="eliminated-item"><span class="icon-x"><i class="fas fa-times"></i></span> Confidence score thresholding</div>
+        <div class="eliminated-item"><span class="icon-x"><i class="fas fa-times"></i></span> Non-Maximum Suppression (NMS)</div>
+
+        <div class="replaced-note">
+          <strong><i class="fas fa-check" style="color:#2e7d32;"></i> Replaced by</strong> a single unified cross-entropy loss over tokenized sequences with autoregressive decoding.
+        </div>
+      </div>
+
+      <div class="column is-6">
+        <h3 class="title is-5 section-title">Key Contributions</h3>
+        <div class="content">
+          <ol>
+            <li class="mb-3"><strong>First fully autoregressive 3D detector</strong> that directly generates object sequences from point clouds, performing on par with leading proposal-based and query-based detectors.</li>
+            <li class="mb-3"><strong>Detailed ablation</strong> of design factors—including object-level tokenization, sequence ordering, and decoding methodologies—that are critical for effective autoregressive 3D detection.</li>
+            <li><strong>New capabilities</strong> enabled by the autoregressive formulation: compatibility with RL fine-tuning, and promptable decoding.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- Main Results -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-title">Results on nuScenes</h2>
+
+    <div class="content">
+      <p>
+        We evaluate AutoReg3D across four different point-cloud encoder families. For fair comparison, confidence thresholds for baseline detectors are selected to maximize F1 on the training set.
+      </p>
+    </div>
+
+    <!-- Results Table -->
+    <div class="table-container">
+      <table class="table is-bordered is-hoverable is-fullwidth results-table">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Encoder</th>
+            <th>Det. Head</th>
+            <th>Prec.</th>
+            <th>Rec.</th>
+            <th>F1</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PointPillars</td>
+            <td>Pillar Conv.</td>
+            <td>Anchor-based</td>
+            <td>58.3</td>
+            <td>50.0</td>
+            <td>53.1</td>
+          </tr>
+          <tr>
+            <td>CenterPoint</td>
+            <td>Pillar Conv.</td>
+            <td>Center-based</td>
+            <td>67.9</td>
+            <td>53.3</td>
+            <td>59.5</td>
+          </tr>
+          <tr class="ours-row">
+            <td>AutoReg3D (Ours)</td>
+            <td>Pillar Conv.</td>
+            <td>Autoregressive</td>
+            <td>69.6</td>
+            <td>52.4</td>
+            <td>59.2</td>
+          </tr>
+
+          <tr class="group-sep"><td colspan="6"></td></tr>
+
+          <tr>
+            <td>SECOND</td>
+            <td>Voxel Conv.</td>
+            <td>Anchor-based</td>
+            <td>63.5</td>
+            <td>55.6</td>
+            <td>59.1</td>
+          </tr>
+          <tr>
+            <td>CenterPoint</td>
+            <td>Voxel Conv.</td>
+            <td>Center-based</td>
+            <td>72.8</td>
+            <td>60.3</td>
+            <td>65.8</td>
+          </tr>
+          <tr class="ours-row">
+            <td>AutoReg3D (Ours)</td>
+            <td>Voxel Conv.</td>
+            <td>Autoregressive</td>
+            <td>74.9</td>
+            <td>59.4</td>
+            <td>65.8</td>
+          </tr>
+
+          <tr class="group-sep"><td colspan="6"></td></tr>
+
+          <tr>
+            <td>DSVT</td>
+            <td>Transformer</td>
+            <td>Non-Autoregressive</td>
+            <td>79.1</td>
+            <td>66.3</td>
+            <td>71.6</td>
+          </tr>
+          <tr class="ours-row">
+            <td>AutoReg3D (Ours)</td>
+            <td>Transformer</td>
+            <td>Autoregressive</td>
+            <td>77.0</td>
+            <td>64.1</td>
+            <td>69.5</td>
+          </tr>
+
+          <tr class="group-sep"><td colspan="6"></td></tr>
+
+          <tr>
+            <td>LION</td>
+            <td>Mamba</td>
+            <td>Non-Autoregressive</td>
+            <td>78.6</td>
+            <td>68.3</td>
+            <td>72.5</td>
+          </tr>
+          <tr class="ours-row">
+            <td>AutoReg3D (Ours)</td>
+            <td>Mamba</td>
+            <td>Autoregressive</td>
+            <td>77.5</td>
+            <td>65.2</td>
+            <td>70.4</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-caption">
+      <strong>nuScenes Validation Detection Performance.</strong> AutoReg3D achieves competitive performance across all encoder types. Notably, it attains higher precision than regression-based counterparts on pillar and voxel backbones — a benefit of autoregressive generation where each box is conditioned on previous outputs.
+    </p>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- RL Fine-tuning -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-title">Reinforcement Learning Fine-Tuning</h2>
+
+    <div class="content">
+      <p>
+        While teacher-orcing optimizes token likelihood, it does not explicitly optimize the set-level detection objective. 
+        The autoregressive formulation uniquely enables RL-based optimization with task-aligned rewards, improving global consistency. We show using <strong>GRPO</strong> with an IoU-based reward, we improve the voxel-based model's F1 score.
+      </p>
+    </div>
+
+    <div class="columns is-vcentered is-centered">
+      <div class="column is-10">
+        <div class="contrib-box">
+          <!-- <h3>GRPO Fine-Tuning</h3> -->
+          <div style="display:flex; gap:3rem; align-items:center;">
+            <p class="is-size-7 has-text-grey" style="width:55%;">GRPO fine-tuning boosts F1 through improved recall, reflecting the task-specific reward that encourages more complete detection sequences and successfully
+detect objects that were previously missed.</p>
+            <table class="table is-narrow ablation-table" style="width:45%; margin-bottom:0;">
+              <thead><tr><th>Model</th><th>Prec.</th><th>Rec.</th><th>F1</th></tr></thead>
+              <tbody>
+                <tr><td>Teacher Forcing</td><td>74.9</td><td>59.4</td><td>65.8</td></tr>
+                <tr class="best-row"><td>+ GRPO</td><td>74.5</td><td>60.9</td><td>66.7</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- Ablations -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-title">Ablation Studies</h2>
+
+
+    <div class="columns">
+      <!-- Object Ordering -->
+      <div class="column is-4">
+        <div class="contrib-box">
+          <h3>Object Ordering</h3>
+          <table class="table is-narrow is-fullwidth ablation-table">
+            <thead><tr><th>Order</th><th>F1</th></tr></thead>
+            <tbody>
+              <tr><td>Random</td><td>56.3</td></tr>
+              <tr><td>Point Number</td><td>61.8</td></tr>
+              <tr class="best-row"><td>Near-to-far</td><td>65.8</td></tr>
+            </tbody>
+          </table>
+          <p class="is-size-7 has-text-grey mt-2">Near-to-far ordering significantly outperforms alternatives by exploiting natural inter-object dependencies.</p>
+        </div>
+      </div>
+
+      <!-- Token Ordering -->
+      <div class="column is-4">
+        <div class="contrib-box">
+          <h3>Token Ordering</h3>
+          <table class="table is-narrow is-fullwidth ablation-table">
+            <thead><tr><th>Class Position</th><th>F1</th></tr></thead>
+            <tbody>
+              <tr><td>Last</td><td>64.9</td></tr>
+              <tr><td>Middle</td><td>65.2</td></tr>
+              <tr class="best-row"><td>First</td><td>65.8</td></tr>
+            </tbody>
+          </table>
+          <p class="is-size-7 has-text-grey mt-2">Predicting class first provides useful context for subsequent attribute tokens.</p>
+        </div>
+      </div>
+
+      <!-- Decoding Method -->
+      <div class="column is-4">
+        <div class="contrib-box">
+          <h3>Decoding Strategy</h3>
+          <table class="table is-narrow is-fullwidth ablation-table">
+            <thead><tr><th>Method</th><th>F1</th></tr></thead>
+            <tbody>
+              <tr><td>Nucleus</td><td>61.9</td></tr>
+              <tr><td>Greedy</td><td>65.8</td></tr>
+              <tr class="best-row"><td>Beam Search</td><td>66.1</td></tr>
+            </tbody>
+          </table>
+          <p class="is-size-7 has-text-grey mt-2">Beam search trades inference time for accuracy; greedy is competitive with minimal overhead.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Occlusion + Cascading -->
+    <div class="columns mt-4">
+      <div class="column is-6">
+        <div class="contrib-box">
+          <h3>Robustness Under Occlusion</h3>
+          <table class="table is-narrow is-fullwidth ablation-table">
+            <thead><tr><th>Visibility</th><th>CenterPoint</th><th>Ours</th><th>Δ</th></tr></thead>
+            <tbody>
+              <tr><td>0–40%</td><td>28.9</td><td>30.0</td><td><span class="improvement-badge">+4.1%</span></td></tr>
+              <tr><td>40–60%</td><td>30.5</td><td>31.1</td><td><span class="improvement-badge">+1.8%</span></td></tr>
+              <tr><td>60–80%</td><td>43.2</td><td>42.7</td><td><span class="improvement-badge negative">−1.3%</span></td></tr>
+              <tr><td>80–100%</td><td>67.0</td><td>67.6</td><td><span class="improvement-badge">+0.8%</span></td></tr>
+            </tbody>
+          </table>
+          <p class="is-size-7 has-text-grey mt-2">Autoregressive modeling particularly helps under heavy occlusion, where inter-object dependencies are most informative.</p>
+        </div>
+      </div>
+
+      <div class="column is-6">
+        <div class="contrib-box">
+          <h3>Cascading Refinement</h3>
+          <table class="table is-narrow is-fullwidth ablation-table">
+            <thead><tr><th>Model</th><th>Prec.</th><th>Rec.</th><th>F1</th></tr></thead>
+            <tbody>
+              <tr><td>Prior only</td><td>74.9</td><td>59.4</td><td>65.8</td></tr>
+              <tr><td>Completion only</td><td>68.9</td><td>49.9</td><td>56.3</td></tr>
+              <tr class="best-row"><td>Prior → Completion</td><td>74.7</td><td>60.2</td><td>66.2</td></tr>
+            </tbody>
+          </table>
+          <p class="is-size-7 has-text-grey mt-2">Conditioning a random-order model on the prior's outputs recovers missed detections, improving overall F1.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- Qualitative Results -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-title">Qualitative Results</h2>
+    <div class="content">
+      <p>
+        Visualization of AutoReg3D detections on nuScenes validation scenes across four encoder backbones. Each image shows predicted 3D bounding boxes overlaid on the BEV point cloud.
+      </p>
+      <p>
+        Generates boxes from <span style="color:#f900ff;font-weight:600;">first</span> to <span style="color:#608eff;font-weight:600;">last</span>, ground-truth boxes are in <span style="color:#808080;font-weight:600;">gray</span>.
+      </p>
+    </div>
+
+    <!-- Carousels: 1x4 grid -->
+    <div class="qual-row">
+
+      <div class="qual-col">
+        <p class="qual-col-label">Pillar Conv.</p>
+        <div class="qual-carousel active" id="carousel-pillar">
+        <button class="carousel-btn prev" onclick="carouselStep('pillar', -1)"><i class="fas fa-chevron-left"></i></button>
+        <div class="carousel-track">
+          <div class="carousel-slide active"><img src="static/images/qualitative/pillar/qualitative_sample_0a0371e14a8e4fbeb32ddd5df9707016.png" alt="Pillar sample 1"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_01c9e357d2544b25888d1ec0f7b6059e.png" alt="Pillar sample 2"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_2cb04989d26a485b90ab47a1577e0f7a.png" alt="Pillar sample 3"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_6c7261cf1e9746b5a8bfeb89e9ce22e8.png" alt="Pillar sample 4"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_6cf7822aa27a4e599d4cdd249fca5763.png" alt="Pillar sample 5"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_7f5ee7deedd0472d9b7038cc613cf885.png" alt="Pillar sample 6"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_59b048ee1ed2466c973e45f9e79ce5d1.png" alt="Pillar sample 7"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_76e95a17645048dfb21258344c096d2a.png" alt="Pillar sample 8"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_78e778e7e6c84dc59c0436a4d6ff5032.png" alt="Pillar sample 9"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/pillar/qualitative_sample_39961df49391439fbca612a8efe1c531.png" alt="Pillar sample 10"></div>
+        </div>
+        <button class="carousel-btn next" onclick="carouselStep('pillar', 1)"><i class="fas fa-chevron-right"></i></button>
+        <div class="carousel-dots" id="dots-pillar"></div>
+      </div>
+      </div>
+
+      <div class="qual-col">
+        <p class="qual-col-label">Voxel Conv.</p>
+        <div class="qual-carousel active" id="carousel-voxel">
+        <button class="carousel-btn prev" onclick="carouselStep('voxel', -1)"><i class="fas fa-chevron-left"></i></button>
+        <div class="carousel-track">
+          <div class="carousel-slide active"><img src="static/images/qualitative/voxel/qualitative_sample_0af54713a83e4d54b852eb2239039136.png" alt="Voxel scene 1"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_1d944d3936de4206be42d584a884635f.png" alt="Voxel scene 2"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_1f9b04c2eca4497288cf23649ac47b8a.png" alt="Voxel scene 3"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_02e898c7625f48c88379bafee924c290.png" alt="Voxel scene 4"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_4c5a8356ea1741548238807ba41235d3.png" alt="Voxel scene 5"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_5fe961cfd2b444b0898c3abb7c969e77.png" alt="Voxel scene 6"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_6c0c3cb4fb0448c28a94f8fedfd99b7a.png" alt="Voxel scene 7"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_6fde33ada8b04da9929057fd6b85a72b.png" alt="Voxel scene 8"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_8cf0dfa0d78f469e8b10760332954028.png" alt="Voxel scene 9"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/voxel/qualitative_sample_8d966583bc7c4627a2437be13761529c.png" alt="Voxel scene 10"></div>
+        </div>
+        <button class="carousel-btn next" onclick="carouselStep('voxel', 1)"><i class="fas fa-chevron-right"></i></button>
+        <div class="carousel-dots" id="dots-voxel"></div>
+      </div>
+      </div>
+
+      <div class="qual-col">
+        <p class="qual-col-label">Transformer</p>
+        <div class="qual-carousel active" id="carousel-transformer">
+        <button class="carousel-btn prev" onclick="carouselStep('transformer', -1)"><i class="fas fa-chevron-left"></i></button>
+        <div class="carousel-track">
+          <div class="carousel-slide active"><img src="static/images/qualitative/transformer/qualitative_sample_3be45164a35e465cbfbc3c20ef060718.png" alt="Transformer sample 1"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_4abbb74395314826bf1f12d601b61800.png" alt="Transformer sample 2"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_4c093c86d3e14c879e71d80a55fb7bf1.png" alt="Transformer sample 3"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_5b4e9d5b6fd744b396e42095b1a3fedc.png" alt="Transformer sample 4"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_6c9cb9d8b9824c1d9ce30ced72c07f86.png" alt="Transformer sample 5"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_7ab0b11b05f84e9e834cd4c2e1a73e48.png" alt="Transformer sample 6"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_7b6ea69a11e3462ab78a3c53d4cb3b08.png" alt="Transformer sample 7"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_7cbb7c8028c8463ab7efafdeeb9c0bde.png" alt="Transformer sample 8"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_09e9a73cd33b4e9ab40bf9f56f4b80a9.png" alt="Transformer sample 9"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/transformer/qualitative_sample_9b37ba29ded04e9294b9fb9b10b45e47.png" alt="Transformer sample 10"></div>
+        </div>
+        <button class="carousel-btn next" onclick="carouselStep('transformer', 1)"><i class="fas fa-chevron-right"></i></button>
+        <div class="carousel-dots" id="dots-transformer"></div>
+      </div>
+      </div>
+
+      <div class="qual-col">
+        <p class="qual-col-label">Mamba</p>
+        <div class="qual-carousel active" id="carousel-mamba">
+        <button class="carousel-btn prev" onclick="carouselStep('mamba', -1)"><i class="fas fa-chevron-left"></i></button>
+        <div class="carousel-track">
+          <div class="carousel-slide active"><img src="static/images/qualitative/mamba/qualitative_sample_1dba2c2cc477431e837ef77249b4a5e3.png" alt="Mamba sample 1"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_4baa89b0de744b06b2a89f5ff15f3c71.png" alt="Mamba sample 2"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_4fa6e380731d4819bc404bcf38240a90.png" alt="Mamba sample 3"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_5a54a45e59ad48cab7213ff7d1828f3c.png" alt="Mamba sample 4"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_6cf7822aa27a4e599d4cdd249fca5763.png" alt="Mamba sample 5"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_7a4691919fd44e7e9695cd367bcad6cb.png" alt="Mamba sample 6"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_7f5ee7deedd0472d9b7038cc613cf885.png" alt="Mamba sample 7"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_016de52682c840a2be5a393e3fb92c29.png" alt="Mamba sample 8"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_21f333d5deb043bba7fe772ff5775b0e.png" alt="Mamba sample 9"></div>
+          <div class="carousel-slide"><img src="static/images/qualitative/mamba/qualitative_sample_40fb1386a6374d769fcb591bf8f6bf42.png" alt="Mamba sample 10"></div>
+        </div>
+        <button class="carousel-btn next" onclick="carouselStep('mamba', 1)"><i class="fas fa-chevron-right"></i></button>
+        <div class="carousel-dots" id="dots-mamba"></div>
+      </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- Cascading Refinement Qualitative -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 section-title">Cascading Refinement</h2>
+    <div class="content">
+      <p>
+        Comparison of detections before and after cascading refinement. The completion model conditioned on the prior's outputs recovers missed detections while preserving precision.
+      </p>
+      <p>
+        Generates boxes from <span style="color:#f900ff;font-weight:600;">first</span> to <span style="color:#608eff;font-weight:600;">last</span>, ground-truth boxes are in <span style="color:#808080;font-weight:600;">gray</span>.
+      </p>
+    </div>
+
+    <div class="qual-carousel-wrap">
+      <div class="qual-carousel active" id="carousel-cascade">
+        <div class="cascade-grid cascade-header">
+          <div class="cascade-col-label">Ground Truth</div>
+          <div class="cascade-col-label">Before Refinement</div>
+          <div class="cascade-col-label">After Refinement</div>
+        </div>
+        <button class="carousel-btn prev" onclick="carouselStep('cascade', -1)"><i class="fas fa-chevron-left"></i></button>
+        <div class="carousel-track">
+
+          <div class="carousel-slide active">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_0c23d9c6329d40938e1f0593c15f1e70.png" alt="GT 1"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_0c23d9c6329d40938e1f0593c15f1e70.png" alt="Before refinement 1"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_0c23d9c6329d40938e1f0593c15f1e70.png" alt="After refinement 1"></div>
+            </div>
+          </div>
+
+          <div class="carousel-slide">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_2a86b2b0a481470a83c81f4d2b514276.png" alt="GT 2"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_2a86b2b0a481470a83c81f4d2b514276.png" alt="Before refinement 2"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_2a86b2b0a481470a83c81f4d2b514276.png" alt="After refinement 2"></div>
+            </div>
+          </div>
+
+          <div class="carousel-slide">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_5bb3471504034b869f8ab0d4f7060d4b.png" alt="GT 3"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_5bb3471504034b869f8ab0d4f7060d4b.png" alt="Before refinement 3"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_5bb3471504034b869f8ab0d4f7060d4b.png" alt="After refinement 3"></div>
+            </div>
+          </div>
+
+          <div class="carousel-slide">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_335da4966e3745dc845362f4c54eeae8.png" alt="GT 4"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_335da4966e3745dc845362f4c54eeae8.png" alt="Before refinement 4"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_335da4966e3745dc845362f4c54eeae8.png" alt="After refinement 4"></div>
+            </div>
+          </div>
+
+          <div class="carousel-slide">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_979ebe32c3154795bd17e6e5765d83ea.png" alt="GT 5"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_979ebe32c3154795bd17e6e5765d83ea.png" alt="Before refinement 5"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_979ebe32c3154795bd17e6e5765d83ea.png" alt="After refinement 5"></div>
+            </div>
+          </div>
+
+          <div class="carousel-slide">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_b58468bede76466aa930983808b6ad29.png" alt="GT 6"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_b58468bede76466aa930983808b6ad29.png" alt="Before refinement 6"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_b58468bede76466aa930983808b6ad29.png" alt="After refinement 6"></div>
+            </div>
+          </div>
+
+          <div class="carousel-slide">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_ead06ddfed704c82bdb77a1da54ca79e.png" alt="GT 7"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_ead06ddfed704c82bdb77a1da54ca79e.png" alt="Before refinement 7"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_ead06ddfed704c82bdb77a1da54ca79e.png" alt="After refinement 7"></div>
+            </div>
+          </div>
+
+          <div class="carousel-slide">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_f0ee73d43c2748fbb584d1a062e2773a.png" alt="GT 8"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_f0ee73d43c2748fbb584d1a062e2773a.png" alt="Before refinement 8"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_f0ee73d43c2748fbb584d1a062e2773a.png" alt="After refinement 8"></div>
+            </div>
+          </div>
+
+          <div class="carousel-slide">
+            <div class="cascade-grid">
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_gt_f69deb5862844f09a690500fe6a2b9b0.png" alt="GT 9"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_prior_f69deb5862844f09a690500fe6a2b9b0.png" alt="Before refinement 9"></div>
+              <div class="cascade-col"><img src="static/images/qualitative/cascade/qualitative_aggregation_f69deb5862844f09a690500fe6a2b9b0.png" alt="After refinement 9"></div>
+            </div>
+          </div>
+
+        </div>
+        <button class="carousel-btn next" onclick="carouselStep('cascade', 1)"><i class="fas fa-chevron-right"></i></button>
+        <div class="carousel-dots" id="dots-cascade"></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="section-divider">
+
+<!-- BibTeX -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title is-3 section-title">BibTeX</h2>
+    <div class="bibtex-box">
+      <button class="copy-btn" onclick="copyBibtex()">
+        <i class="fas fa-copy"></i> Copy
+      </button>
+      <pre><code>@inproceedings{huang2026autoreg3d,
+  title     = {On the Feasibility and Opportunity of Autoregressive 3D Object Detection},
+  author    = {Huang, Zanming and Yoo, Jinsu and Jeon, Sooyoung and Liu, Zhenzhen and Campbell, Mark
+               and Weinberger, Kilian Q and Hariharan, Bharath and Chao, Wei-Lun and Luo, Katie Z},
+  booktitle = {CVPR Findings},
+  year      = {2026}
+}</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="container">
+    <div class="content has-text-centered">
+      <p>
+        This website template is borrowed from <a href="https://nerfies.github.io">Nerfies</a> under a
+        <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0 License</a>.
+      </p>
+    </div>
+  </div>
+</footer>
+
+<script src="static/js/index.js"></script>
+</body>
+</html>

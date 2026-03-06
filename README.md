@@ -1,1 +1,1 @@
-# AutoReg3D
+# Project page for AutoReg3D
