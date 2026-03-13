@@ -557,7 +557,51 @@ body {
 }
 
 @media (max-width: 768px) {
+  /* Pipeline container: reduce padding */
+  .pipeline-container {
+    padding: 1rem;
+  }
+
+  /* Pipeline steps: zoom to shrink proportionally while keeping layout intact */
+  .pipeline-container .columns.is-mobile {
+    zoom: 0.75;
+  }
+
+  /* Qualitative carousels: single column instead of 2x2 grid */
+  .qual-row {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  /* Reduce carousel height on small screens */
+  .carousel-track {
+    height: 240px;
+  }
+
+  /* Make wide tables horizontally scrollable */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* RL section: stack text and table vertically */
+  .rl-content {
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+  .rl-content p,
+  .rl-content table {
+    width: 100% !important;
+  }
+
+  /* Cascade grid: single column */
   .cascade-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .pipeline-container .columns.is-mobile {
+    zoom: 0.55;
   }
 }
