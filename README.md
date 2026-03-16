@@ -4,7 +4,7 @@ by
 
 *CVPR 2026 Findings*
 
-[[Project Page](https://tzmhuang.github.io/autoreg3d)] [[arXiv](https://arxiv.org/abs/XXXX.XXXXX)]
+[[Project Page](https://tzmhuang.github.io/autoreg3d)] [[arXiv](https://arxiv.org/abs/2603.07985)]
 
 
 > Code coming soon.
