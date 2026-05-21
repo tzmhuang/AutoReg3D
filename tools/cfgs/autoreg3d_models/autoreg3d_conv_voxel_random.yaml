@@ -1,0 +1,159 @@
+CLASS_NAMES: ['car','truck', 'construction_vehicle', 'bus', 'trailer',
+              'barrier', 'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone']
+
+DATA_CONFIG:
+    _BASE_CONFIG_: cfgs/dataset_configs/nuscenes_dataset.yaml
+    POINT_CLOUD_RANGE: [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
+
+    DATA_AUGMENTOR:
+        DISABLE_AUG_LIST: ['placeholder']
+        AUG_CONFIG_LIST:
+            - NAME: gt_sampling
+              DB_INFO_PATH:
+                  - nuscenes_dbinfos_10sweeps_withvelo.pkl
+              USE_SHARED_MEMORY: True
+
+              DB_DATA_PATH: 
+                  - nuscenes_gt_database_10sweeps_withvelo_global.npy
+              PREPARE: {
+                filter_by_min_points: [
+                    'car:5','truck:5', 'construction_vehicle:5', 'bus:5', 'trailer:5',
+                    'barrier:5', 'motorcycle:5', 'bicycle:5', 'pedestrian:5', 'traffic_cone:5'
+                ],
+
+              }
+              SAMPLE_GROUPS: [
+                  'car:2','truck:3', 'construction_vehicle:7', 'bus:4', 'trailer:6',
+                  'barrier:2', 'motorcycle:6', 'bicycle:6', 'pedestrian:2', 'traffic_cone:2'
+              ]
+
+              NUM_POINT_FEATURES: 5
+              DATABASE_WITH_FAKELIDAR: False
+              REMOVE_EXTRA_WIDTH: [0.0, 0.0, 0.0]
+              LIMIT_WHOLE_SCENE: True
+
+            - NAME: random_world_flip
+              ALONG_AXIS_LIST: ['x', 'y']
+            
+            - NAME: random_world_rotation
+              WORLD_ROT_ANGLE: [-0.78539816, 0.78539816]
+
+            - NAME: random_world_scaling
+              WORLD_SCALE_RANGE: [0.9, 1.1]
+
+            - NAME: random_world_translation
+              NOISE_TRANSLATE_STD: [0.5, 0.5, 0.5]
+
+            - NAME: reorder_object_instances
+              ORDER: random
+    
+    DATA_PROCESSOR:
+        - NAME: mask_points_and_boxes_outside_range
+          REMOVE_OUTSIDE_BOXES: True
+        - NAME: shuffle_points
+          SHUFFLE_ENABLED: {
+            'train': True,
+            'test': True
+          }
+
+        - NAME: transform_points_to_voxels
+          VOXEL_SIZE: [0.075, 0.075, 0.2]
+          MAX_POINTS_PER_VOXEL: 10
+          MAX_NUMBER_OF_VOXELS: {
+            'train': 120000,
+            'test': 160000
+          }
+
+        - NAME: boxes_to_sequence
+          MIN_BOX_RANGE: [0, 0, 0, -3.14159, -30, -30]
+          MAX_BOX_RANGE: [ 30, 10, 10, 3.14159, 30, 30]
+          NUMERICAL_VOCAB_SIZES: [2160, 2160, 160, 600, 200, 200, 125, 600, 600]  # XYZLWHT V_x V_y
+          CLASS_VOCAB_SIZE: 11 # 10 + 1
+          CLASS_PLACEMENT: first
+          MAX_NUM_INSTANCES: 100
+          PREDICT_VELOCITY: True
+          
+    TRAIN_WITH_SPEED: True
+
+
+MODEL:
+    NAME: AutoReg3D
+
+    VFE:
+        NAME: MeanVFE
+
+    BACKBONE_3D:
+        NAME: VoxelResBackBone8x
+        USE_BIAS: False
+
+    MAP_TO_BEV:
+        NAME: HeightCompression
+        NUM_BEV_FEATURES: 256
+
+    BACKBONE_2D:
+        NAME: BaseBEVBackbone
+        LAYER_NUMS: [5, 5]
+        LAYER_STRIDES: [1, 2]
+        NUM_FILTERS: [128, 256]
+        UPSAMPLE_STRIDES: [1, 2]
+        NUM_UPSAMPLE_FILTERS: [256, 256]
+
+    BEV_COMPRESSOR:
+        NAME: ConvBEVCompressor
+        COMPRESSED_BEV_FEATURES: 256
+        COMPRESSED_GRID_SIZE: [180, 180]
+        ARGS: {
+            "kernel_size": 3,
+            "stride": 1,
+            "padding": 1,
+        }
+    
+    TOKENIZER_CONFIG:
+        MIN_BOX_RANGE: [0, 0, 0, -3.14159, -30, -30]
+        MAX_BOX_RANGE: [ 30, 10, 10, 3.14159, 30, 30]
+        NUMERICAL_VOCAB_SIZES: [2160, 2160, 160, 600, 200, 200, 125, 600, 600]  # XYZLWHT V_x V_y
+        CLASS_VOCAB_SIZE: 11 # 10+1
+        CLASS_PLACEMENT: first
+        PREDICT_VELOCITY: True
+
+    DENSE_HEAD:
+        NAME: AutoReg3DHead
+        VOCAB_SIZE: 6819
+        MAX_SEQ_LENGTH: 1002
+        FEATURE_GRID_RESOLUTION: [1, 1]
+        NUM_HEADS: 8
+        NUM_LAYERS: 6
+        CLASS_AGNOSTIC: False
+        ACTIVATION: relu
+        EOS_SKIP_NUM: 0
+        AUTOCAST_EVAL: True
+        LIMIT_BOX_TOKEN_TO_VALID: True
+
+    POST_PROCESSING:
+        RECALL_THRESH_LIST: [0.3, 0.5, 0.7]
+        EVAL_METRIC: kitti
+
+
+OPTIMIZATION:
+    BATCH_SIZE_PER_GPU: 16
+    NUM_EPOCHS: 20
+
+    OPTIMIZER: adamW_onecycle
+    LR: 0.001
+    WEIGHT_DECAY: 0.01
+    BETAS: [0.9, 0.999]
+    UNFREEZE_BACKBONE_EPOCH: 10
+
+
+    MOMS: [0.9, 0.9]
+    PCT_START: 0.1
+    DIV_FACTOR: 10
+    DECAY_STEP_LIST: [35, 45]
+
+    GRAD_NORM_CLIP: 2
+    AMP_DTYPE: bf16
+
+HOOK:
+    DisableAugmentationHook:
+        DISABLE_AUG_LIST: ['gt_sampling']
+        NUM_LAST_EPOCHS: 5
